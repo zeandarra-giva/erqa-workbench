@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ERQA Workbench (prototype)
 
-## Getting Started
+A clickable prototype of the proposed ERQA Case Workbench: one place for the weekly
+justification review, from intake to HR/training reporting.
 
-First, run the development server:
+> **Synthetic data only.** Every name, ID and justification is fictional. Nothing is sent anywhere;
+> state is kept in your browser (localStorage). Use "Reset demo data" in the sidebar to start over.
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
+npm test           # rules-engine + routing unit tests
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Screens
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Screen | Replaces / adds |
+| --- | --- |
+| Overview | Insights: weekly outcomes, why justifications fail, app hotspots, repeat reviewers |
+| Weekly Intake | `.txt → MS Access → queries → SharePoint upload` (dedupe, placeholders, countries, dates, HTML) |
+| Assessment Queue | Ruleset pre-screen on every case + bulk "apply suggestions" (analyst confirms) |
+| Challenge Board | Kanban of the challenge → escalation loop with automatic 7-day deadlines |
+| Case detail | Evidence per rule, decisions per stage, revised-justification re-check, audit trail |
+| Outbox | Batch emailing replaced by template drafts, approve and send in one click |
+| HR & Training Reports | Phase 3 routing (no action / 3× in 12 months) → weekly HR + monthly LMS CSVs |
+| Ruleset & Back-test | Decision matrix R1–R13, acronym allowlist, live "try it", agreement vs history |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Where the logic lives
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/lib/rules.ts`: ERQA challenge ruleset (Steps 0–4, R1–R13) as explainable checks
+- `src/lib/routing.ts`: Phase 3 HR / training routing
+- `src/lib/intake.ts`: weekly extract cleaning pipeline
+- `src/lib/insights.ts`: KPIs, hotspots, back-test
+- `src/lib/seed.ts`: deterministic synthetic dataset (demo date: 24 Nov 2026)
