@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERQA Discovery Readout</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --ink:#1b2330; --muted:#5b6676; --line:#dfe3ea;
+    --accent:#1f4e9c; --accent-soft:#e8eef9; --ok:#1d7a4d; --ok-soft:#e5f4ec;
+    --warn:#a35d00; --warn-soft:#fdf1df; --bad:#b3261e; --bad-soft:#fbe7e5;
+    --violet:#5a3e9e; --violet-soft:#efeafa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.45}
+  .deck{height:100vh;width:100vw;overflow:hidden;position:relative}
+  .slide{position:absolute;inset:0;padding:44px 64px 72px;overflow:auto;display:none;background:var(--bg)}
+  .slide.active{display:block}
+  .kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px}
+  h1{font-size:44px;line-height:1.1;margin:0 0 14px}
+  h2{font-size:30px;margin:0 0 6px}
+  h3{font-size:17px;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 22px;max-width:980px}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card p{margin:4px 0}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;margin-right:4px;vertical-align:middle}
+  .t-ok{background:var(--ok-soft);color:var(--ok)} .t-warn{background:var(--warn-soft);color:var(--warn)}
+  .t-bad{background:var(--bad-soft);color:var(--bad)} .t-acc{background:var(--accent-soft);color:var(--accent)}
+  .t-vio{background:var(--violet-soft);color:var(--violet)}
+  table{border-collapse:collapse;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#eef1f5;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  tr:last-child td{border-bottom:0}
+  .big{font-size:34px;font-weight:700;line-height:1.1}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:8px;margin:14px 0}
+  .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+  .callout.bad{border-color:var(--bad);background:var(--bad-soft)}
+  ul{margin:6px 0;padding-left:20px} li{margin:3px 0}
+  /* nav */
+  .nav{position:fixed;bottom:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:12px;padding:0 20px;
+    background:rgba(255,255,255,.94);border-top:1px solid var(--line);z-index:10}
+  .nav button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:14px}
+  .nav button:hover{background:var(--accent-soft)}
+  .prog{flex:1;height:4px;background:var(--line);border-radius:4px;overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--accent);width:0}
+  .count{font-size:13px;color:var(--muted);min-width:64px;text-align:right}
+  .toc{position:fixed;inset:0 0 52px 0;background:rgba(246,247,249,.98);z-index:9;display:none;padding:40px 64px;overflow:auto}
+  .toc.open{display:block}
+  .toc ol{columns:2;font-size:16px} .toc a{color:var(--accent);cursor:pointer;text-decoration:none}
+  /* flow */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .step{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;position:relative;margin-right:26px}
+  .step:not(:last-child)::after{content:"→";position:absolute;right:-21px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:700}
+  .step.dashed{border-style:dashed;background:transparent}
+  .step .n{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+  .manual{border-color:var(--warn);box-shadow:inset 0 0 0 1px var(--warn)}
+  .pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .node{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+  .node.repo{border-radius:14px;background:#f1f4f8}
+  .node.m{border:2px solid var(--warn)}
+  .arrow{color:var(--muted);font-weight:700}
+  .bar{height:12px;border-radius:6px;background:var(--accent)}
+  .barrow{display:grid;grid-template-columns:110px 1fr 90px;gap:10px;align-items:center;font-size:14px;margin:6px 0}
+  .barbg{background:#e9edf3;border-radius:6px;overflow:hidden}
+  details.q{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+  details.q summary{cursor:pointer;font-weight:600}
+  details.q .why{margin-top:6px;font-size:14px;color:var(--muted)}
+  details.q .why b{color:var(--ink)}
+  /* prototype */
+  .proto{display:grid;grid-template-columns:330px 1fr;gap:14px;height:calc(100vh - 250px);min-height:520px}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+  .kpi b{font-size:22px;display:block}
+  .queue{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:auto}
+  .qi{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+  .qi:hover{background:#f3f6fb} .qi.sel{background:var(--accent-soft)}
+  .qi .top{display:flex;justify-content:space-between;font-size:13px}
+  .qi .ent{font-weight:600;font-size:14px;margin:2px 0}
+  .detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:auto;padding:16px 18px}
+  .field{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+  .field .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  .flag{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .flag:last-child{border-bottom:0}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .btn{border:1px solid var(--line);border-radius:8px;padding:7px 12px;background:var(--surface);cursor:pointer;font:inherit;font-size:14px}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .btn.bad{background:var(--bad);color:#fff;border-color:var(--bad)}
+  .email{white-space:pre-wrap;font-family:Consolas,Menlo,monospace;font-size:12.5px;background:#f7f8fa;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .tl{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+  .tl span{font-size:12px;padding:4px 8px;border-radius:6px;background:#eef1f5;color:var(--muted)}
+  .tl span.on{background:var(--accent);color:#fff}
+  .tl span.done{background:var(--accent-soft);color:var(--accent)}
+  .disclaim{font-size:12px;color:var(--warn);font-weight:600}
+  @media (max-width:900px){
+    .slide{padding:24px 16px 72px}
+    .g2,.g3,.g4{grid-template-columns:1fr}
+    .proto{grid-template-columns:1fr;height:auto}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    h1{font-size:32px}
+  }
+  @media print{
+    .nav,.toc{display:none!important}
+    .deck{height:auto;overflow:visible}
+    .slide{display:block!important;position:relative;page-break-after:always;overflow:visible;padding:24px}
+    details.q{break-inside:avoid} details.q .why{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- 1 TITLE -->
+<section class="slide">
+  <div style="max-width:1000px;margin-top:8vh">
+    <div class="kicker">Biweekly Progress · Meeting 01 · 24 Nov 2026</div>
+    <h1>ERQA Justification Review<br>Discovery Readout</h1>
+    <p class="sub" style="font-size:19px">What I've learned about the current manual workflow, where I think the effort goes, the modules I'd propose, a clickable concept prototype, and the questions I need the team's help with.</p>
+    <div class="grid g3" style="max-width:900px">
+      <div class="card"><span class="tag t-acc">STATUS</span><p><b>Discovery</b>. Nothing has been built or deployed.</p></div>
+      <div class="card"><span class="tag t-warn">NOTE</span><p>Everything here is <b>my understanding</b>. Please correct me.</p></div>
+      <div class="card"><span class="tag t-ok">DATA</span><p>The prototype uses <b>synthetic data only</b>.</p></div>
+    </div>
+    <p class="muted small" style="margin-top:28px">Navigate with ← → or Space · press <b>T</b> for the slide list · print with Ctrl/Cmd + P</p>
+  </div>
+</section>
+
+<!-- 2 AGENDA -->
+<section class="slide">
+  <div class="kicker">Today</div>
+  <h2>Agenda and what I need from this meeting</h2>
+  <p class="sub">I want to leave with my understanding corrected, the priorities agreed, and a plan for getting the data.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Agenda</h3>
+      <ol>
+        <li>What I reviewed</li>
+        <li>The workflow as I understand it (3 phases + data flow)</li>
+        <li>Dataset snapshot</li>
+        <li>Key discoveries</li>
+        <li>Proposed modules and hypotheses</li>
+        <li>Concept prototype (live demo)</li>
+        <li>Solution options and roadmap</li>
+        <li>Questions for the team</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>Outcomes I'm hoping for</h3>
+      <ul>
+        <li><b>Validate</b> the process understanding and fix what I got wrong</li>
+        <li><b>Agree</b> which pain point to tackle first</li>
+        <li><b>Get answers</b> to the must-ask questions, or an owner for each</li>
+        <li><b>Agree</b> next steps: column headers, a time study, a constraints review</li>
+      </ul>
+      <div class="callout">My goal is to <b>take repetitive work off the team</b>. Analysts keep every QA decision.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 SOURCES -->
+<section class="slide">
+  <div class="kicker">Inputs</div>
+  <h2>What I reviewed, and what I haven't seen yet</h2>
+  <p class="sub">Each finding traces back to one of these sources. Where two sources disagreed, I used the official process map.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h3><span class="tag t-ok">REVIEWED</span></h3>
+      <table>
+        <tr><th>Source</th><th>Used for</th></tr>
+        <tr><td>Interviews with the ERQA team</td><td>Pain points, how the work actually runs</td></tr>
+        <tr><td>Justification guide for EERS reviewers</td><td>Required fields, challenge criteria, timelines</td></tr>
+        <tr><td>ERQA Justification Review data flow diagram</td><td>Systems, repositories, hand-offs</td></tr>
+        <tr><td>ERQA Justification Review process map (V2)</td><td>The official decision logic, Phases 1–3</td></tr>
+        <tr><td>Access-review history dataset (summary + 55 column headers)</td><td>Volumes, outcomes, trends, data model, data quality</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3><span class="tag t-warn">NOT YET SEEN</span></h3>
+      <ul>
+        <li>The full raw dataset. So far I've seen the 55 column names and a few rows.</li>
+        <li>Volumes and time per task (no baseline yet)</li>
+        <li>The MS Access query logic</li>
+        <li>Email templates and the LMS/HR report formats</li>
+        <li>The "IAM &amp; Deferred Revocations" stage</li>
+        <li>Which tools we're allowed to use, and who approves them</li>
+      </ul>
+      <div class="callout warn small">So any savings figures I mention today are <b>hypotheses</b>. I need a baseline before I can claim impact.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 PROCESS OVERVIEW -->
+<section class="slide">
+  <div class="kicker">Current workflow · 1 of 4</div>
+  <h2>The justification review end to end</h2>
+  <p class="sub">There are four stages on the official map. The fourth is drawn dashed and isn't connected to the others.</p>
+  <div class="flow" style="margin-bottom:22px">
+    <div class="step"><div class="n">Phase 1</div><b>Primary Review</b><p class="small muted">The manager or delegate reviews access in EERS. Approves or revokes, and writes a justification if the access is high-risk and low-commonality.</p></div>
+    <div class="step"><div class="n">Phase 2</div><b>Challenge &amp; Escalation</b><p class="small muted">MSaaS sends a weekly sample. ERQA evaluates, challenges, escalates, then closes each case as PASS or FAIL.</p></div>
+    <div class="step"><div class="n">Phase 3</div><b>HR Reporting</b><p class="small muted">Fails go to remedial training (monthly LMS report) and/or HR (weekly, Accountability Framework).</p></div>
+    <div class="step dashed"><div class="n">Phase 4 ?</div><b>IAM &amp; Deferred Revocations</b><p class="small muted">No detail in the material I have. In scope or not?</p></div>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>Who's involved</h3><ul class="small">
+      <li><b>EERS Reviewer</b>: a manager or delegate, writes the justification</li>
+      <li><b>Reviewer's manager</b>: CC'd on the challenge, receives the escalation</li>
+      <li><b>MSaaS team</b>: produces the weekly sample</li>
+      <li><b>ERQA analysts</b>: evaluate, challenge, decide</li>
+      <li><b>HR</b>: runs the predefined HR process</li></ul></div>
+    <div class="card"><h3>When a justification is needed</h3><ul class="small">
+      <li>The access is <b>high-risk</b>, based on what it lets the person do and EERS attribute codes (not the IS risk rating)</li>
+      <li><b>and</b> it's <b>low-commonality</b>: fewer than 25% of the reviewer's direct reports have it</li>
+      <li>Examples: privileged, external, money transfer</li>
+      <li>Applies to semi-annual, ad hoc and transfer reviews</li></ul></div>
+    <div class="card"><h3>What managers must answer</h3><ul class="small">
+      <li>Reason the access is needed (dropdown + context)</li>
+      <li>Frequency of use (dropdown)</li>
+      <li>Worker's role</li>
+      <li>Business process</li>
+      <li>Reason for low commonality</li></ul>
+      <p class="small muted">The dataset has all 5 as columns: Template Name (the reason dropdown), FREQUENCY, JUST_ROLE, JUST_PROCESS, JUST_COMM.</p></div>
+  </div>
+</section>
+
+<!-- 5 PHASE 2 -->
+<section class="slide">
+  <div class="kicker">Current workflow · 2 of 4</div>
+  <h2>Phase 2: the challenge and escalation loop</h2>
+  <p class="sub">Two 7-calendar-day clocks, several decision points, and an email at every step.</p>
+  <div class="grid g2">
+    <div class="card">
+      <table>
+        <tr><th>#</th><th>Step</th><th>Outcome</th></tr>
+        <tr><td>1</td><td>ERQA evaluates the sampled justification against the defined criteria</td><td>Meets them → <span class="tag t-ok">PASS</span> · Doesn't → challenge</td></tr>
+        <tr><td>2</td><td>Challenge email to the reviewer (their manager on CC)</td><td>⏱ 7 calendar days</td></tr>
+        <tr><td>3</td><td>Did the reviewer act?</td><td>No → escalate (step 5)</td></tr>
+        <tr><td>4</td><td>Acted: was the access revoked? If not, did the revised justification pass?</td><td>Revoked → <span class="tag t-bad">FAIL</span> ✅ · Passed → <span class="tag t-ok">PASS</span> · Still fails → escalate</td></tr>
+        <tr><td>5</td><td>Escalation email to the reviewer's manager</td><td>⏱ 7 more calendar days</td></tr>
+        <tr><td>6</td><td>Acted after escalation, and did it pass?</td><td>Yes → <span class="tag t-ok">PASS</span> · No action, still fails, or revoked → <span class="tag t-bad">FAIL</span></td></tr>
+        <tr><td>7</td><td>FAIL → Phase 3 HR Reporting</td><td></td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="callout"><b>✅ Confirmed: revoking = FAIL, at either stage.</b> If the reviewer revokes the access after the challenge <i>or</i> after the escalation, the case is a FAIL. Revoking means they accept the original justification was wrong. The process map doesn't draw the after-escalation branch, so it may be worth adding in the next version.</div>
+      <div class="card"><h3>Why this loop is costly (my hypothesis)</h3>
+        <ul class="small">
+          <li>Every challenge means writing and sending an email (in batches, by hand), tracking a deadline, rechecking EERS and matching replies in the mailbox</li>
+          <li>An escalation repeats all of that</li>
+          <li>The deadlines are fixed rules (+7 days), so a system could track them</li>
+        </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 PHASE 3 -->
+<section class="slide">
+  <div class="kicker">Current workflow · 3 of 4</div>
+  <h2>Phase 3: routing a FAIL</h2>
+  <p class="sub">The process map sets clear rules for each type of failure.</p>
+  <div class="grid g2">
+    <table>
+      <tr><th>Failure type</th><th>Remedial training<br><span style="text-transform:none">(monthly report to LMS)</span></th><th>HR report<br><span style="text-transform:none">(weekly, Accountability Framework)</span></th></tr>
+      <tr><td><b>No action</b> by the reviewer</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Acted but still failed, <b>3rd fail in 12 months</b></td><td>—</td><td>✅</td></tr>
+      <tr><td>Acted but still failed, not a repeat</td><td>✅</td><td>—</td></tr>
+    </table>
+    <div>
+      <div class="card"><h3>What this means for the team</h3>
+        <ul class="small">
+          <li>Every fail has to be <b>classified</b> as no-action or acted</li>
+          <li>The 3-in-12-months rule means <b>looking up each reviewer's fail history</b></li>
+          <li>Two separate reports on two schedules (weekly and monthly)</li>
+        </ul></div>
+      <div class="callout warn small">The training box says "all FAIL cases", but the arrows skip repeat fails where the reviewer acted. Which is right? And does "LMS" mean the Learning Management System?</div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 DATA FLOW -->
+<section class="slide">
+  <div class="kicker">Current workflow · 4 of 4</div>
+  <h2>How the data moves, and where people do it by hand</h2>
+  <p class="sub">From the data flow diagram, with one correction: signed-off reviews go from the <b>EERS database</b> to MSaaS. <span class="tag t-warn">ORANGE</span> = a manual step.</p>
+  <div class="card" style="margin-bottom:14px">
+    <div class="pipe">
+      <span class="node">Manager signs off</span><span class="arrow">→</span>
+      <span class="node repo">EERS database</span><span class="arrow">→</span>
+      <span class="node">MSaaS: weekly sample</span><span class="arrow">→</span>
+      <span class="node repo">Shared drive (.txt)</span><span class="arrow">→</span>
+      <span class="node m">Retrieve + load</span><span class="arrow">→</span>
+      <span class="node repo">MS Access</span><span class="arrow">→</span>
+      <span class="node m">Run queries (dedupe, fill fields)</span><span class="arrow">→</span>
+      <span class="node m">Upload</span><span class="arrow">→</span>
+      <span class="node repo">SharePoint List (ERQA)</span>
+    </div>
+    <div class="pipe" style="margin-top:12px">
+      <span class="node m">Assess justification</span><span class="arrow">→</span>
+      <span class="node m">Email challenge (batch)</span><span class="arrow">→</span>
+      <span class="node repo">Shared mailbox</span><span class="arrow">→</span>
+      <span class="node m">Review modified justification / recheck EERS</span><span class="arrow">→</span>
+      <span class="node m">Assess outcome</span><span class="arrow">→</span>
+      <span class="node m">Save evidence + update case</span><span class="arrow">→</span>
+      <span class="node repo">Shared drive (evidence) + SharePoint</span><span class="arrow">→</span>
+      <span class="node m">Failure report via SNOW/email</span><span class="arrow">→</span>
+      <span class="node">HR</span>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div class="card"><div class="big">~13</div><p class="small muted">manual steps I can see, across 3 phases</p></div>
+    <div class="card"><div class="big">6</div><p class="small muted">places the data lives: EERS, .txt drop, MS Access, SharePoint, mailbox, evidence drive</p></div>
+    <div class="card"><div class="big">3</div><p class="small muted">clocks to track: 7-day challenge, 7-day escalation, weekly/monthly reports</p></div>
+  </div>
+</section>
+
+<!-- 8 DATASET -->
+<section class="slide">
+  <div class="kicker">Dataset snapshot</div>
+  <h2>Access-review history: 4,372 cases, 55 columns, 2025–2026</h2>
+  <p class="sub">Each row is one review case. These numbers come from a summary; I haven't seen the raw data yet.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Outcomes</h3>
+      <div class="barrow"><span>Pass</span><div class="barbg"><div class="bar" style="width:74.9%;background:var(--ok)"></div></div><span>3,276 · 74.9%</span></div>
+      <div class="barrow"><span>Exclusion</span><div class="barbg"><div class="bar" style="width:15.5%;background:#7a8699"></div></div><span>679 · 15.5%</span></div>
+      <div class="barrow"><span>Fail</span><div class="barbg"><div class="bar" style="width:9.5%;background:var(--bad)"></div></div><span>417 · 9.5%</span></div>
+      <h3 style="margin-top:14px">Challenge workload</h3>
+      <div class="barrow"><span>Challenged</span><div class="barbg"><div class="bar" style="width:55.9%"></div></div><span>2,446 · 55.9%</span></div>
+      <div class="barrow"><span>Not challenged</span><div class="barbg"><div class="bar" style="width:44.1%;background:#9fb3d6"></div></div><span>1,926 · 44.1%</span></div>
+      <p class="small muted">All 417 fails were challenged first.</p>
+    </div>
+    <div class="card">
+      <h3>Fail rate by year</h3>
+      <div class="barrow"><span>2025</span><div class="barbg"><div class="bar" style="width:52%;background:var(--bad)"></div></div><span>13.0% (255/1,960)</span></div>
+      <div class="barrow"><span>2026</span><div class="barbg"><div class="bar" style="width:26.8%;background:var(--bad)"></div></div><span>6.7% (162/2,412)</span></div>
+      <h3 style="margin-top:14px">After a fail</h3>
+      <div class="barrow"><span>Training</span><div class="barbg"><div class="bar" style="width:85.9%;background:var(--violet)"></div></div><span>358 · 85.9%</span></div>
+      <div class="barrow"><span>HR</span><div class="barbg"><div class="bar" style="width:12%;background:var(--violet)"></div></div><span>50 · 12.0%</span></div>
+      <h3 style="margin-top:14px">Data quality</h3>
+      <ul class="small">
+        <li>118 different country values (USA / United States, IND / India…)</li>
+        <li>Some rows have the wrong content in the region/sector/business fields</li>
+        <li>Some columns are mostly empty by design (Revocation ID, HR fields, deferred revocation)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 8b DATA MODEL -->
+<section class="slide">
+  <div class="kicker">Dataset · what the 55 columns tell us</div>
+  <h2>The dataset is an export of the ERQA SharePoint List</h2>
+  <p class="sub">Based on the column headers and a few sample rows. No personal data is shown here.</p>
+  <div class="grid g4" style="margin-bottom:14px">
+    <div class="card small"><span class="tag t-acc">A–Q</span><b>Case outcome</b><br>Analyst, result, fail/substantiation dates, revoked vs. justified, exclusion type, re-attempt, HR, training</div>
+    <div class="card small"><span class="tag t-acc">R–W</span><b>Challenge &amp; escalation</b><br>Challenge, challenge due, escalation, escalation due, year, week (= the weekly sample)</div>
+    <div class="card small"><span class="tag t-acc">X–AR</span><b>Review, access &amp; justification</b><br>Reviewer, manager/delegate, review type, sign-off, worker, app, entitlement, the 5 justification fields</div>
+    <div class="card small"><span class="tag t-acc">AS–BC</span><b>Org + SharePoint metadata</b><br>Segment, sector, region, business, then created/modified by, path, item ID</div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3><span class="tag t-ok">CONFIRMED</span></h3><ul class="small">
+      <li><b>Template Name</b> = the reason dropdown. The free text is in JUST_ROLE, JUST_PROCESS and JUST_COMM.</li>
+      <li><b>Exclusion</b> = "Entitlement not visible anymore" or "Commonality is not low anymore".</li>
+      <li>All the rows I saw share the same upload timestamp, so each weekly sample is <b>bulk-uploaded</b> to the list.</li>
+      <li>Some free-text answers aren't in English, though the guide asks for clear English. That's a possible extra pre-screen check (C6).</li></ul></div>
+    <div class="card"><h3><span class="tag t-warn">GAPS WE'D NEED TO CLOSE</span></h3><ul class="small">
+      <li><b>No column for the failure reason</b> (no action / acted but insufficient / revoked), yet Phase 3 routing depends on it. This may explain the training/HR mismatch.</li>
+      <li>Only <b>due dates</b> are stored, not the dates emails were sent, so response times can't be measured.</li>
+      <li>There's no record of <b>which criteria failed</b>, which makes it hard to coach reviewers on specifics.</li>
+      <li><b>Review Type</b> is empty in every row I saw. "- Select -" placeholders and dates stored as text need cleaning.</li></ul></div>
+  </div>
+</section>
+
+<!-- 9 DISCOVERIES -->
+<section class="slide">
+  <div class="kicker">Key discoveries</div>
+  <h2>Six things that stood out</h2>
+  <p class="sub">Each one is a discovery to validate, not a conclusion.</p>
+  <div class="grid g3">
+    <div class="card"><span class="tag t-acc">D1</span><h3>A challenge fixes most justifications</h3><p class="small">2,446 cases were challenged and only 417 ended as fails. Most managers correct the justification once they're challenged. The cost is probably <b>the chasing</b> (emails, clocks, rechecks), not the decision to challenge.</p></div>
+    <div class="card"><span class="tag t-acc">D2</span><h3>The criteria are partly mechanical</h3><p class="small">The official reasons for a challenge are: text copied across fields, vague answers like "BAU", role and process mixed up, no low-commonality reason, acronyms not spelled out. Several of these could be <b>flagged automatically</b> for the analyst.</p></div>
+    <div class="card"><span class="tag t-acc">D3</span><h3>The deadlines and routing follow fixed rules</h3><p class="small">+7 days, +7 days, no-action vs. acted, 3 fails in 12 months, weekly vs. monthly. A system can apply rules like these <b>the same way every time</b> and log them for audit.</p></div>
+    <div class="card"><span class="tag t-warn">D4</span><h3>The training/HR numbers don't add up</h3><p class="small">If every fail followed the Phase 3 rules, 358 training + 50 HR would need a <b>negative</b> number of no-action fails. Either the columns are incomplete, the rules changed over time, or I've misread the fields.</p></div>
+    <div class="card"><span class="tag t-ok">D5 ✅</span><h3>The "template" is a dropdown</h3><p class="small">"Access is required for their job function" (about 96% of rows) is the <b>Template Name</b> dropdown, i.e., the reason the access is needed. The column headers confirm it. The useful signal is in the free-text columns JUST_ROLE, JUST_PROCESS and JUST_COMM.</p></div>
+    <div class="card"><span class="tag t-vio">D6</span><h3>There's already an internal AI tool</h3><p class="small">The guide points managers to the <b>Stylus <code>/justification-review</code> preset</b> to draft and check justifications. Could ERQA use something similar on the assessment side?</p></div>
+  </div>
+  <div class="callout small" style="margin-top:14px">One point on the trend: the fail rate halved from 13.0% to 6.7%. To show that's real improvement and not lighter QA, I'd show it <b>next to the sample size and the challenge rate</b>.</div>
+</section>
+
+<!-- 10 MODULES -->
+<section class="slide">
+  <div class="kicker">Proposal</div>
+  <h2>Six modules, mapped to the workflow</h2>
+  <p class="sub">They can be built and adopted one at a time. In every module, the analyst keeps the final say.</p>
+  <div class="grid g3">
+    <div class="card"><span class="tag t-acc">M1 · Intake Pipeline</span><p class="small">Pick up the weekly .txt automatically, remove duplicates, add the extra fields, load into the case tracker, and log row counts.<br><b>Replaces:</b> the manual load into MS Access, the queries and the upload.</p></div>
+    <div class="card"><span class="tag t-acc">M2 · Case Tracker &amp; SLA Engine</span><p class="small">One record per case with its status, stage, and the 7-day and escalation due dates computed automatically. Views for "due soon" and "overdue".<br><b>Replaces:</b> tracking deadlines by hand and rechecking status.</p></div>
+    <div class="card"><span class="tag t-acc">M3 · Justification Pre-Screen</span><p class="small">Flags matching the C1–C5 criteria, with the reason shown for each. A <i>suggestion</i> only; the analyst decides.<br><b>Supports:</b> faster, more consistent assessment.</p></div>
+    <div class="card"><span class="tag t-acc">M4 · Communication Automation</span><p class="small">Challenge and escalation emails drafted from templates with the case details and the specific missing criteria. The analyst approves before anything is sent. Replies matched to cases by case ID.<br><b>Replaces:</b> writing emails in batches by hand.</p></div>
+    <div class="card"><span class="tag t-acc">M5 · Outcome Routing &amp; Reporting</span><p class="small">Classify each fail as no-action or acted, check 3 fails in 12 months automatically, and produce the weekly HR and monthly LMS reports with a routing log.<br><b>Replaces:</b> the manual Phase 3 work.</p></div>
+    <div class="card"><span class="tag t-acc">M6 · Governance Dashboard</span><p class="small">Pass/fail/exclusion trend, challenge rate, backlog and SLA breaches, and hotspots by app, entitlement, segment and reviewer. Country values standardized.<br><b>Supports:</b> leadership reporting and audit.</p></div>
+  </div>
+  <div class="callout small" style="margin-top:14px"><span class="tag t-vio">OPTIONAL M7</span> <b>AI assist</b>, only if an internal tool (e.g., Stylus) is approved for this data: summarize revised justifications and draft wording. It is never a decision-maker.</div>
+</section>
+
+<!-- 11 HYPOTHESES -->
+<section class="slide">
+  <div class="kicker">Hypotheses</div>
+  <h2>Where I think the value is, and how to test it</h2>
+  <p class="sub">Each hypothesis needs data to test it. The priority order is my first guess.</p>
+  <table>
+    <tr><th>#</th><th>Hypothesis</th><th>Module</th><th>How we'd validate it</th><th>Value</th><th>Difficulty</th></tr>
+    <tr><td>H9</td><td>The challenge → escalation loop (emails, clocks, rechecks) takes most of the analysts' time</td><td>M2, M4</td><td>Time study: minutes per challenge, emails per week</td><td><span class="tag t-ok">HIGH</span></td><td>Medium</td></tr>
+    <tr><td>H10</td><td>The weekly intake (.txt → Access → SharePoint) is repeated manual work that could run on its own</td><td>M1</td><td>Minutes per week; the Access query logic</td><td><span class="tag t-ok">MED-HIGH</span></td><td>Low–Med</td></tr>
+    <tr><td>H12</td><td>Routing fails to training/HR by hand causes inconsistencies (and the data doesn't fit the rules)</td><td>M5</td><td>How the 3-in-12-months check is done; check the dataset's HR and training fields</td><td><span class="tag t-ok">HIGH RISK REDUCTION</span></td><td>Low</td></tr>
+    <tr><td>H8</td><td>Checking the C1–C5 criteria mechanically speeds up assessment and makes it more consistent</td><td>M3</td><td>Back-test the flags against past challenge decisions</td><td><span class="tag t-acc">MEDIUM</span></td><td>Low–Med</td></tr>
+    <tr><td>H3/H6</td><td>Leadership needs reliable trends and remediation follow-through</td><td>M6</td><td>What leadership asks for today, and how often</td><td><span class="tag t-acc">MEDIUM</span></td><td>Low</td></tr>
+    <tr><td>H11</td><td>An internal AI tool can support assessment and drafting</td><td>M7</td><td>Is Stylus approved for this data class and use?</td><td><span class="tag t-vio">UNKNOWN</span></td><td>Unknown</td></tr>
+  </table>
+  <div class="callout small" style="margin-top:14px"><b>Proposed MVP:</b> M1 + M2 + M4 + M5, which covers everything from intake to HR reporting. M3 flags come next, then the dashboard.</div>
+</section>
+
+<!-- 12 PROTOTYPE -->
+<section class="slide" id="protoSlide">
+  <div class="kicker">Concept prototype · interactive</div>
+  <h2>ERQA Case Workbench (concept)</h2>
+  <p class="disclaim">Synthetic data only. This shows the concept, not a working system. Pre-screen flags are suggestions; the analyst decides.</p>
+  <div class="kpis" id="kpis"></div>
+  <div class="proto">
+    <div class="queue" id="queue"></div>
+    <div class="detail" id="detail"></div>
+  </div>
+</section>
+
+<!-- 13 OPTIONS -->
+<section class="slide">
+  <div class="kicker">Solution options</div>
+  <h2>The same modules on different platforms, depending on what we're allowed to use</h2>
+  <p class="sub">Which tools are approved decides the platform. I'd like to start with what the team already has: there's already a SharePoint List.</p>
+  <div class="grid g3">
+    <div class="card"><span class="tag t-ok">TIER A · Lowest friction</span><h3>Excel / Power Query / Power BI</h3><ul class="small"><li>Power Query replaces the MS Access load and queries (M1)</li><li>Formula-based deadlines and flags (M2, M3)</li><li>Power BI dashboard (M6)</li></ul><p class="small muted">Few approvals needed · refreshed by hand · limited automation</p></div>
+    <div class="card" style="border:2px solid var(--accent)"><span class="tag t-acc">TIER B · Recommended to explore</span><h3>SharePoint + Power Automate (+ Power Apps)</h3><ul class="small"><li>SharePoint List as the case tracker, with version history for audit</li><li>Power Automate for deadlines, reminders, email drafts and weekly/monthly reports</li><li>Power Apps for the analyst workbench</li></ul><p class="small muted">Builds on the existing SharePoint List · needs Power Platform approval</p></div>
+    <div class="card"><span class="tag t-warn">TIER C · Most capable</span><h3>Internal app + database</h3><ul class="small"><li>Scheduled pipeline and an internal database</li><li>A web workbench like the prototype</li><li>Optional internal AI assist</li></ul><p class="small muted">The most approvals and engineering effort · possible model risk review</p></div>
+  </div>
+  <h3 style="margin-top:20px">Design principles, whatever the tier</h3>
+  <div class="grid g4">
+    <div class="card small"><b>Human decides.</b> The system suggests, drafts and reminders; analysts approve.</div>
+    <div class="card small"><b>Explainable.</b> Rules before models, and every flag shows why.</div>
+    <div class="card small"><b>Data stays inside.</b> No external services without approval.</div>
+    <div class="card small"><b>Audit by default.</b> Every status change, email and override is logged.</div>
+  </div>
+</section>
+
+<!-- 14 ROADMAP -->
+<section class="slide">
+  <div class="kicker">Roadmap (proposed)</div>
+  <h2>Next steps</h2>
+  <p class="sub">Timing depends on access to data and on tool approvals. I'll adjust after today.</p>
+  <div class="flow">
+    <div class="step"><div class="n">Next 2 weeks</div><b>Validate &amp; baseline</b><ul class="small"><li>Answers to today's questions</li><li>Column headers + data dictionary</li><li>A light time study (1 weekly cycle)</li><li>Fill in the constraints register</li></ul></div>
+    <div class="step"><div class="n">Weeks 3–4</div><b>Design</b><ul class="small"><li>Pick a tier</li><li>Data model + synthetic test set</li><li>Rule specs for M2, M3 and M5</li><li>Email templates with the team</li></ul></div>
+    <div class="step"><div class="n">Weeks 5–8</div><b>Build the MVP</b><ul class="small"><li>M1 intake, M2 tracker</li><li>M4 email drafts</li><li>M5 routing and reports</li></ul></div>
+    <div class="step"><div class="n">Weeks 9–10</div><b>Pilot</b><ul class="small"><li>Run it alongside the current process for 1–2 weekly cycles</li><li>Measure against the baseline</li><li>Control-owner walkthrough</li></ul></div>
+  </div>
+  <div class="grid g3" style="margin-top:18px">
+    <div class="card"><h3>Success measures (draft)</h3><ul class="small"><li>Analyst hours per weekly cycle</li><li>Number of missed 7-day deadlines</li><li>Fails routed correctly to training/HR</li><li>Time to produce the HR/LMS reports</li></ul></div>
+    <div class="card"><h3>Risks</h3><ul class="small"><li>Tool approvals take longer than expected</li><li>Pre-screen seen as a "model" under model risk policy</li><li>Gaps in historical data</li></ul></div>
+    <div class="card"><h3>What I need</h3><ul class="small"><li>About 1 hour with an analyst to walk through a live cycle</li><li>Column headers (names only)</li><li>A contact in InfoSec or IT for tooling</li></ul></div>
+  </div>
+</section>
+
+<!-- 15 QUESTIONS 1 -->
+<section class="slide">
+  <div class="kicker">Questions for the team · 1 of 3</div>
+  <h2>Volumes, time and intake</h2>
+  <p class="sub">Click a question to see why I'm asking. ★ = must ask today.</p>
+  <div class="grid g2">
+    <div>
+      <details class="q" open><summary>★ How many cases come in each weekly sample, and how many are challenged and escalated per week? Are there peak periods?</summary><div class="why"><b>Why:</b> the dataset gives yearly totals, not the weekly load. Weekly volume determines how much time automation can save and how much load the system has to handle. Peaks (e.g., semi-annual campaigns) show when the pain is worst.</div></details>
+      <details class="q" open><summary>★ Roughly how many minutes per case for: the first assessment, writing a challenge email, rechecking EERS, and closing a case with evidence?</summary><div class="why"><b>Why:</b> this is the <b>baseline</b>. Without it I can't prove impact, and I can't tell which module to build first. The aim is to put the biggest time cost first.</div></details>
+      <details class="q"><summary>★ Which step do you find most tedious or error-prone?</summary><div class="why"><b>Why:</b> the team's own pain points matter more than my guesses. Fixing what annoys people most gets the tool adopted, and you know things the diagrams don't show.</div></details>
+    </div>
+    <div>
+      <details class="q"><summary>What do the MS Access queries do: which fields identify a duplicate, and which fields are added and from where?</summary><div class="why"><b>Why:</b> M1 has to reproduce this logic exactly. If I miss a hidden step, the data going into the tracker would be wrong.</div></details>
+      <details class="q"><summary>Is the .txt from MSaaS always the same format? Who owns it, and could it be delivered differently (e.g., straight to SharePoint)?</summary><div class="why"><b>Why:</b> automation depends on a stable input. Knowing the owner tells me who to coordinate with on changes, and whether we can skip the file drop entirely.</div></details>
+      <details class="q"><summary>Who uses the SharePoint List today, and what views and columns do you rely on?</summary><div class="why"><b>Why:</b> if Tier B is chosen, the existing list becomes the case tracker. I'd rather extend what you use than replace it.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- 16 QUESTIONS 2 -->
+<section class="slide">
+  <div class="kicker">Questions for the team · 2 of 3</div>
+  <h2>Assessment, challenge and outcome rules</h2>
+  <p class="sub">These clear up the places where my sources disagree or I'm unsure.</p>
+  <div class="grid g2">
+    <div>
+      <details class="q" open><summary>★ The "automated YES/NO suggestion" in your queue: where does it appear, what produces it, and how often do you agree with it?</summary><div class="why"><b>Why:</b> it isn't on the process map. If something already pre-screens justifications, M3 should build on it, not duplicate it. How often you agree with it also shows how well automated checks can work here.</div></details>
+      <details class="q" open><summary>★ When a case fails, where do you record whether it was "no action" or "acted but insufficient"? There's no column for it.</summary><div class="why"><b>Why:</b> Phase 3 routing (training vs. HR) depends on this distinction. If it's only in someone's memory or in the comment field, routing can go wrong, and that may explain why the training/HR counts don't add up. (Already answered: revoking at either stage = FAIL ✅)</div></details>
+      <details class="q"><summary>What are the "defined criteria*" (the asterisk on the map)? Is there a checklist?</summary><div class="why"><b>Why:</b> the pre-screen must follow the <b>official</b> criteria and nothing beyond them. That's how it stays defensible in an audit.</div></details>
+      <details class="q"><summary>Is there a second check on analyst decisions (maker-checker)? Do analysts ever disagree?</summary><div class="why"><b>Why:</b> this tells me whether the tool needs an approval step, and whether consistency between analysts is something leadership cares about.</div></details>
+    </div>
+    <div>
+      <details class="q"><summary>How do you track the 7-day deadlines today, and how often are they missed?</summary><div class="why"><b>Why:</b> this shows how much M2 is worth. If deadlines are tracked from memory or in a spreadsheet, missed escalations are a control risk as well as a time cost.</div></details>
+      <details class="q"><summary>Are challenge and escalation emails templated? How big is a batch, and how do you match replies to cases?</summary><div class="why"><b>Why:</b> M4 drafts emails from templates. Matching replies to cases is a hidden manual cost that a case ID in the subject line could remove. I also need to know if sending from the shared mailbox can be automated.</div></details>
+      <details class="q"><summary>How is "3 fails in 12 months" checked, and what do the weekly HR and monthly LMS reports look like?</summary><div class="why"><b>Why:</b> this is a lookup across history that's easy to get wrong by hand. I need the exact report formats to generate them automatically (M5).</div></details>
+      <details class="q"><summary>What do "Substantiation Date" and "Re-attempt ID" (values like "email" or a number) mean exactly?</summary><div class="why"><b>Why:</b> these look like the dates and channels of the reviewer's response. If so, they're the basis for measuring turnaround and for the deadline engine. I don't want to guess what they mean.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- 17 QUESTIONS 3 -->
+<section class="slide">
+  <div class="kicker">Questions for the team · 3 of 3</div>
+  <h2>Data, scope, tools and success</h2>
+  <p class="sub">These decide what's feasible and how we'll measure success.</p>
+  <div class="grid g2">
+    <div>
+      <details class="q" open><summary>★ A few column meanings: what are "3/9 Error Checker" (in ERQA Comment), "SOA", and "HRC number / HRC result"? Is "Review Type" ever filled in?</summary><div class="why"><b>Why:</b> I have the 55 headers now ✅, but these aren't self-explanatory. Guessing wrong would put errors into the data model and the dashboard. Review Type is empty in every row I saw, and it's needed to split results by semi-annual, ad hoc and transfer reviews.</div></details>
+      <details class="q"><summary>Are "Entitlement not visible anymore" and "Commonality is not low anymore" the only exclusion types? Who decides an exclusion?</summary><div class="why"><b>Why:</b> exclusions are 15.5% of cases. If they follow fixed rules, the system can detect them automatically instead of an analyst finding them by hand.</div></details>
+      <details class="q"><summary>The training (358) and HR (50) counts don't fit the Phase 3 rules. Are those columns complete? Did the rules change between 2025 and 2026?</summary><div class="why"><b>Why:</b> before using history for KPIs or to test rules, I need to know the fields can be trusted. It might also explain the drop in fail rate.</div></details>
+      <details class="q"><summary>Did sampling or the criteria change between 2025 and 2026? Is 2026 a full year in the data?</summary><div class="why"><b>Why:</b> so we present the 13.0% → 6.7% drop honestly. Leadership and audit will ask whether it reflects real improvement.</div></details>
+      <details class="q"><summary>Is "IAM &amp; Deferred Revocations" in ERQA's scope? Who actually carries out a revocation?</summary><div class="why"><b>Why:</b> it's drawn dashed and has no detail. It sets the boundary of what we build.</div></details>
+    </div>
+    <div>
+      <details class="q" open><summary>★ Which tools are we allowed to use: Power Automate, Power Apps, Power BI, Python, internal servers?</summary><div class="why"><b>Why:</b> this one answer picks the tier (A, B or C) and the timeline. It's the biggest unknown in the design.</div></details>
+      <details class="q"><summary>Can ERQA use Stylus, or another internal AI tool, with this data? Is there a batch or API option?</summary><div class="why"><b>Why:</b> managers already use a justification-review preset. If ERQA can use it too, that's high value with little build effort, but it depends on data classification and policy.</div></details>
+      <details class="q"><summary>Who approves new automation (InfoSec, change board, model risk)? Would rule-based flags count as a "model"?</summary><div class="why"><b>Why:</b> approvals are usually what takes longest at a bank. Knowing early lets me design to pass them, e.g., by keeping everything rule-based and explainable.</div></details>
+      <details class="q"><summary>What are the requirements for keeping evidence and for the audit trail?</summary><div class="why"><b>Why:</b> the case tracker becomes part of the control evidence. Its logging and retention have to meet policy from the start.</div></details>
+      <details class="q"><summary>★ In 3 months, what would make you say this helped?</summary><div class="why"><b>Why:</b> it defines success in your terms (hours saved, no missed escalations, painless reporting) so the roadmap and pilot measure what matters to you.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- 18 CLOSE -->
+<section class="slide">
+  <div style="max-width:1000px;margin-top:6vh">
+    <div class="kicker">Wrap-up</div>
+    <h1>Agreements and next actions</h1>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card"><h3>To agree today</h3><ul>
+        <li>Corrections to the workflow as I've described it</li>
+        <li>Which pain point to tackle first (proposed: the challenge loop + intake)</li>
+        <li>An owner for each open question</li>
+        <li>A time-study slot with one analyst</li></ul></div>
+      <div class="card"><h3>Before the next biweekly</h3><ul>
+        <li>Updated process notes with your corrections</li>
+        <li>Baseline numbers from the time study</li>
+        <li>Data model draft from the column headers</li>
+        <li>Constraints register filled in → choose a tier</li></ul></div>
+    </div>
+    <p class="sub" style="margin-top:28px">Thank you. Please challenge anything I got wrong.</p>
+  </div>
+</section>
+
+</div>
+
+<div class="toc" id="toc"><h2>Slides</h2><ol id="tocList"></ol></div>
+<div class="nav">
+  <button id="prev" aria-label="Previous slide">←</button>
+  <button id="next" aria-label="Next slide">→</button>
+  <button id="tocBtn">Slides (T)</button>
+  <div class="prog"><i id="progBar"></i></div>
+  <div class="count" id="count"></div>
+</div>
+
+<script>
+/* ---------- deck navigation ---------- */
+const slides=[...document.querySelectorAll('.slide')];
+let cur=0;
+function go(i){
+  cur=Math.max(0,Math.min(slides.length-1,i));
+  slides.forEach((s,k)=>s.classList.toggle('active',k===cur));
+  document.getElementById('count').textContent=(cur+1)+' / '+slides.length;
+  document.getElementById('progBar').style.width=((cur+1)/slides.length*100)+'%';
+  try{history.replaceState(null,'','#'+(cur+1))}catch(e){}
+}
+document.getElementById('prev').onclick=()=>go(cur-1);
+document.getElementById('next').onclick=()=>go(cur+1);
+const toc=document.getElementById('toc');
+document.getElementById('tocBtn').onclick=()=>toc.classList.toggle('open');
+slides.forEach((s,k)=>{
+  const t=(s.querySelector('h1,h2')||{}).textContent||('Slide '+(k+1));
+  const li=document.createElement('li');const a=document.createElement('a');
+  a.textContent=t.replace(/\s+/g,' ');a.onclick=()=>{go(k);toc.classList.remove('open')};
+  li.appendChild(a);document.getElementById('tocList').appendChild(li);
+});
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'||e.key==='PageDown'||(e.key===' '&&!e.shiftKey)){e.preventDefault();go(cur+1)}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(cur-1)}
+  else if(e.key==='t'||e.key==='T')toc.classList.toggle('open');
+  else if(e.key==='Escape')toc.classList.remove('open');
+});
+go((parseInt(location.hash.slice(1))||1)-1);
+
+/* ---------- prototype (synthetic data) ---------- */
+const TODAY=new Date('2026-11-24T00:00:00');
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const fmt=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+const daysBetween=(a,b)=>Math.round((b-a)/86400000);
+
+const CASES=[
+ {id:'JR-24117',app:'Payments Hub',ent:'Wire Release Approver',seg:'Treasury Ops',reviewer:'Reviewer R-1042',mgr:'Manager M-311',stage:'New',history:0,
+  f:{reason:'Access is required for their job function',freq:'Daily',role:'Contractor',process:'Needs access to carry out daily responsibilities',lowcom:'Everyone should have this access'}},
+ {id:'JR-24118',app:'Core Ledger',ent:'GL Journal Poster',seg:'Finance',reviewer:'Reviewer R-2210',mgr:'Manager M-118',stage:'New',history:0,
+  f:{reason:'Access is required for their job function',freq:'Weekly',role:'Senior Financial Controller responsible for month-end close for the regional entities',process:'Posts and reviews manual adjusting journal entries (MAJE) during month-end close; validates reconciliations before sign-off',lowcom:'Only two of my nine direct reports perform month-end posting; the others work on forecasting and do not post journals.'}},
+ {id:'JR-24102',app:'Identity Console',ent:'Privileged Admin',seg:'Technology',reviewer:'Reviewer R-0877',mgr:'Manager M-204',stage:'Challenged',sent:'2026-11-19',history:1,
+  f:{reason:'Access is required for their job function',freq:'Ad hoc',role:'BAU support',process:'BAU support',lowcom:'BAU support'}},
+ {id:'JR-24095',app:'Trade Capture',ent:'External File Transfer',seg:'Markets',reviewer:'Reviewer R-1550',mgr:'Manager M-090',stage:'Challenged',sent:'2026-11-17',history:0,
+  f:{reason:'Access is required for their job function',freq:'Weekly',role:'Operations Analyst',process:'Sends SFTP files to the CCP for trade confirmations',lowcom:''}},
+ {id:'JR-24071',app:'Payments Hub',ent:'Beneficiary Maintenance',seg:'Treasury Ops',reviewer:'Reviewer R-0412',mgr:'Manager M-311',stage:'Escalated',sent:'2026-11-05',esc:'2026-11-12',history:2,
+  f:{reason:'Access is required for their job function',freq:'Daily',role:'Needs beneficiary maintenance access',process:'Maintains beneficiaries',lowcom:'Needed for role'}},
+ {id:'JR-24060',app:'Email Gateway',ent:'External Email',seg:'Facilities',reviewer:'Reviewer R-3301',mgr:'Manager M-150',stage:'Closed',outcome:'PASS',history:0,
+  f:{reason:'Access is required for their job function',freq:'Quarterly',role:'Maintenance Technician',process:'Coordinates appointments with external vendors and building managers for licensed repair work',lowcom:'Technicians do not normally need external email; this worker is the backup for the team lead when they are out of office.'}},
+ {id:'JR-24044',app:'Core Ledger',ent:'Period Close Override',seg:'Finance',reviewer:'Reviewer R-0412',mgr:'Manager M-311',stage:'Closed',outcome:'FAIL',failType:'No action',history:2,
+  f:{reason:'Access is required for their job function',freq:'Monthly',role:'Analyst',process:'Required for role',lowcom:'Required for role'}},
+ {id:'JR-24031',app:'Identity Console',ent:'Role Approver',seg:'Technology',reviewer:'Reviewer R-0990',mgr:'Manager M-204',stage:'Closed',outcome:'FAIL',failType:'Action taken, still insufficient',history:0,
+  f:{reason:'Access is required for their job function',freq:'Weekly',role:'IAM Engineer',process:'Approves role changes for IAM',lowcom:'Least privilege'}},
+];
+
+const GENERIC=['bau','business as usual','daily responsibilities','required for role','needed for role','as required','job function','needed for work','everyone','all team'];
+const STATUS_ROLES=['contractor','employee','staff','consultant','user','fte','analyst','support','bau support'];
+const KNOWN=['SFTP','CCP','MAJE','IAM','GL','OOO'];
+const words=t=>(t||'').toLowerCase().match(/[a-z]{3,}/g)||[];
+function jaccard(a,b){const A=new Set(words(a)),B=new Set(words(b));if(!A.size||!B.size)return 0;let i=0;A.forEach(x=>{if(B.has(x))i++});return i/(A.size+B.size-i)}
+function acronymsUnexplained(t){
+  const acr=[...new Set((t||'').match(/\b[A-Z]{2,6}\b/g)||[])];
+  return acr.filter(a=>!new RegExp('\\('+a+'\\)').test(t));
+}
+function prescreen(c){
+  const f=c.f,flags=[];
+  const free={Role:f.role,'Business Process':f.process,'Low Commonality':f.lowcom};
+  const keys=Object.keys(free);
+  for(let i=0;i<keys.length;i++)for(let j=i+1;j<keys.length;j++){
+    const s=jaccard(free[keys[i]],free[keys[j]]);
+    if(s>=0.6)flags.push({c:'C1',sev:'bad',t:`"${keys[i]}" and "${keys[j]}" reuse the same text (${Math.round(s*100)}% overlap)`});
+  }
+  keys.forEach(k=>{
+    const v=(free[k]||'').toLowerCase();
+    const hit=GENERIC.find(g=>v.includes(g));
+    if(hit&&words(v).length<15)flags.push({c:'C2',sev:'bad',t:`"${k}" is vague or generic (contains "${hit}", ${words(v).length} words)`});
+  });
+  const r=(f.role||'').toLowerCase().trim();
+  if(STATUS_ROLES.includes(r)||/\baccess\b/.test(r))flags.push({c:'C3',sev:'warn',t:`"Role" describes a status or the access ("${f.role}"), not the worker's job function`});
+  const lc=(f.lowcom||'').trim();
+  if(!lc)flags.push({c:'C4',sev:'bad',t:'"Low Commonality" is empty'});
+  else if(words(lc).length<8||/everyone|all (my )?team/i.test(lc))flags.push({c:'C4',sev:'bad',t:'"Low Commonality" doesn\'t explain why this worker differs from their peers'});
+  const acr=acronymsUnexplained(f.role+' '+f.process+' '+f.lowcom).filter(a=>!/\(/.test(a));
+  const undefinedAcr=acr.filter(a=>!new RegExp('\\('+a+'\\)').test(f.process+f.lowcom+f.role));
+  if(undefinedAcr.length)flags.push({c:'C5',sev:'warn',t:`Acronym(s) not spelled out: ${undefinedAcr.join(', ')}`});
+  return flags;
+}
+
+function sla(c){
+  if(c.stage==='Challenged'){const due=addDays(new Date(c.sent),7);return{due,left:daysBetween(TODAY,due),label:'Challenge response due'}}
+  if(c.stage==='Escalated'){const due=addDays(new Date(c.esc),7);return{due,left:daysBetween(TODAY,due),label:'Escalation response due'}}
+  return null;
+}
+function chip(c){
+  if(c.stage==='Closed')return c.outcome==='PASS'?'<span class="tag t-ok">PASS</span>':'<span class="tag t-bad">FAIL</span>';
+  if(c.stage==='New')return '<span class="tag t-acc">TO ASSESS</span>';
+  const s=sla(c);const cls=s.left<0?'t-bad':s.left<=2?'t-warn':'t-acc';
+  return `<span class="tag ${cls}">${c.stage.toUpperCase()} · ${s.left<0?Math.abs(s.left)+'d OVERDUE':s.left+'d left'}</span>`;
+}
+let sel=CASES[0].id;
+function renderKpis(){
+  const open=CASES.filter(c=>c.stage!=='Closed');
+  const due2=open.filter(c=>{const s=sla(c);return s&&s.left>=0&&s.left<=2}).length;
+  const over=open.filter(c=>{const s=sla(c);return s&&s.left<0}).length;
+  const toAssess=CASES.filter(c=>c.stage==='New').length;
+  const esc=CASES.filter(c=>c.stage==='Escalated').length;
+  document.getElementById('kpis').innerHTML=
+   `<div class="kpi"><span class="small muted">To assess</span><b>${toAssess}</b></div>
+    <div class="kpi"><span class="small muted">Open challenges</span><b>${CASES.filter(c=>c.stage==='Challenged').length}</b></div>
+    <div class="kpi"><span class="small muted">Escalated</span><b>${esc}</b></div>
+    <div class="kpi"><span class="small muted">Due ≤ 2 days</span><b style="color:var(--warn)">${due2}</b></div>
+    <div class="kpi"><span class="small muted">Overdue</span><b style="color:var(--bad)">${over}</b></div>`;
+}
+function renderQueue(){
+  document.getElementById('queue').innerHTML=CASES.map(c=>{
+    const n=prescreen(c).length;
+    return `<div class="qi ${c.id===sel?'sel':''}" data-id="${c.id}">
+      <div class="top"><span class="muted">${c.id} · ${c.seg}</span><span>${n?`<span class="tag t-warn">${n} flag${n>1?'s':''}</span>`:'<span class="tag t-ok">0 flags</span>'}</span></div>
+      <div class="ent">${c.ent}</div>
+      <div class="top"><span class="muted">${c.app}</span>${chip(c)}</div></div>`}).join('');
+  document.querySelectorAll('.qi').forEach(el=>el.onclick=()=>{sel=el.dataset.id;render()});
+}
+function timeline(c){
+  const st=['Sampled','Assessed','Challenged','Escalated','Closed'];
+  const idx={New:0,Challenged:2,Escalated:3,Closed:4}[c.stage];
+  return '<div class="tl">'+st.map((s,i)=>`<span class="${i<idx?'done':i===idx?'on':''}">${s}</span>`).join('')+'</div>';
+}
+function emailDraft(c,flags,kind){
+  const due=fmt(addDays(TODAY,7));
+  const crit=flags.length?flags.map(f=>'  • '+f.t).join('\n'):'  • (analyst to specify)';
+  if(kind==='esc')return `To: ${c.mgr}\nSubject: [ERQA ${c.id}] ESCALATION: justification required for ${c.ent}\n\nThis is an escalation. A challenge was sent to ${c.reviewer} on ${fmt(new Date(c.sent))} and the justification has not yet met the requirements.\n\nPlease make sure a new (ad-hoc) review is submitted in EERS with a complete justification by ${due} (7 calendar days).\n\nOpen items:\n${crit}\n\nIf no adequate action is taken, the case will be closed as FAIL under the Accountability Framework Procedure.\n\nERQA Team`;
+  return `To: ${c.reviewer}\nCc: ${c.mgr}\nSubject: [ERQA ${c.id}] Justification challenge: ${c.ent} (${c.app})\n\nYour justification for the entitlement above has been sampled for quality review and does not yet meet the requirements.\n\nWhat needs attention:\n${crit}\n\nPlease submit a new (ad-hoc) review in EERS with a revised justification by ${due} (7 calendar days). Each field should give a distinct, specific answer. See the Justification Guide for examples.\n\nERQA Team`;
+}
+function routing(c){
+  const no=c.failType==='No action';const rep=c.history+1>=3;
+  let tr,hr;
+  if(no){tr=hr=true}else if(rep){tr=false;hr=true}else{tr=true;hr=false}
+  return `<div class="card" style="margin-top:10px"><h3>Phase 3 routing (rules applied automatically)</h3>
+   <table><tr><th>Input</th><th>Value</th></tr>
+   <tr><td>Failure type</td><td>${c.failType}</td></tr>
+   <tr><td>Reviewer fails in the last 12 months (including this one)</td><td>${c.history+1}${rep?' → <b>3× rule met</b>':''}</td></tr>
+   <tr><td>Monthly LMS remedial-training report</td><td>${tr?'✅ Included':'—'}</td></tr>
+   <tr><td>Weekly HR report (Accountability Framework)</td><td>${hr?'✅ Included':'—'}</td></tr></table>
+   <p class="small muted">Each routing decision is logged with the rule that triggered it, for audit.${/revoked/i.test(c.failType)?' <b>Open question:</b> do revoked-fails route like "acted but insufficient"? Confirm with ERQA.':''}</p></div>`;
+}
+let draft=null;
+function renderDetail(){
+  const c=CASES.find(x=>x.id===sel),flags=prescreen(c),s=sla(c);
+  const fld=(l,v)=>`<div class="field"><div class="lbl">${l}</div>${v?v.replace(/</g,'&lt;'):'<i class="muted">(empty)</i>'}</div>`;
+  let actions='';
+  if(c.stage==='New')actions=`<div class="btns"><button class="btn ok" data-a="pass">Mark PASS</button><button class="btn pri" data-a="challenge">Challenge → draft email</button></div>`;
+  if(c.stage==='Challenged')actions=`<div class="btns"><button class="btn ok" data-a="pass">Revised justification passes</button><button class="btn bad" data-a="revoked">Access revoked → FAIL</button><button class="btn pri" data-a="escalate">Escalate → draft email</button></div>`;
+  if(c.stage==='Escalated')actions=`<div class="btns"><button class="btn ok" data-a="pass">Revised justification passes</button><button class="btn bad" data-a="revoked">Access revoked → FAIL</button><button class="btn bad" data-a="failNo">No action → FAIL</button><button class="btn bad" data-a="failAct">Still insufficient → FAIL</button></div>`;
+  document.getElementById('detail').innerHTML=`
+   <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+     <div><div class="muted small">${c.id} · ${c.app} · ${c.seg}</div><h3 style="font-size:20px">${c.ent}</h3>
+     <div class="small">${c.reviewer} · manager: ${c.mgr} · reviewer's prior fails (12 mo): ${c.history}</div></div>
+     <div>${chip(c)}</div></div>
+   ${timeline(c)}
+   ${s?`<div class="callout ${s.left<0?'bad':s.left<=2?'warn':''} small"><b>${s.label}:</b> ${fmt(s.due)} (${s.left<0?Math.abs(s.left)+' days overdue':s.left+' days left'}), calculated automatically as +7 calendar days</div>`:''}
+   <div class="grid g2">
+     <div><h3>Justification (as submitted)</h3>
+       ${fld('Reason this access is needed (dropdown)',c.f.reason)}${fld('Frequency of use (dropdown)',c.f.freq)}
+       ${fld("Worker's role",c.f.role)}${fld('Business process',c.f.process)}${fld('Reason for low commonality',c.f.lowcom)}</div>
+     <div><h3>Pre-screen (suggestion only)</h3>
+       <div class="card" style="padding:8px 12px">${flags.length?flags.map(f=>`<div class="flag"><span class="tag ${f.sev==='bad'?'t-bad':'t-warn'}">${f.c}</span><span>${f.t}</span></div>`).join(''):'<div class="flag"><span class="tag t-ok">OK</span><span>No criteria flags. The analyst still reviews the content.</span></div>'}</div>
+       <p class="small muted">C1 copied text · C2 vague/generic · C3 role vs. process · C4 low commonality · C5 acronyms. Taken from the official challenge criteria.</p>
+       ${actions}
+       ${draft&&draft.id===c.id?`<h3>Email draft (analyst reviews before sending)</h3><div class="email">${draft.text.replace(/</g,'&lt;')}</div><div class="btns"><button class="btn pri" data-a="send">Approve &amp; queue (demo)</button><button class="btn" data-a="discard">Discard</button></div>`:''}
+       ${c.stage==='Closed'&&c.outcome==='FAIL'?routing(c):''}
+       ${c.stage==='Closed'&&c.outcome==='PASS'?'<div class="callout small">Closed as PASS. Evidence and status are logged on the case automatically.</div>':''}
+     </div></div>`;
+  document.querySelectorAll('#detail [data-a]').forEach(b=>b.onclick=()=>act(c,flags,b.dataset.a));
+}
+function act(c,flags,a){
+  if(a==='challenge'){draft={id:c.id,kind:'ch',text:emailDraft(c,flags,'ch')};}
+  else if(a==='escalate'){draft={id:c.id,kind:'esc',text:emailDraft(c,flags,'esc')};}
+  else if(a==='send'){
+    if(draft.kind==='ch'){c.stage='Challenged';c.sent=TODAY.toISOString().slice(0,10)}
+    else{c.stage='Escalated';c.esc=TODAY.toISOString().slice(0,10)}
+    draft=null;
+  }
+  else if(a==='discard'){draft=null}
+  else if(a==='pass'){c.stage='Closed';c.outcome='PASS';draft=null}
+  else if(a==='revoked'){c.failType=c.stage==='Escalated'?'Access revoked after escalation':'Access revoked after challenge';c.stage='Closed';c.outcome='FAIL';draft=null}
+  else if(a==='failNo'){c.stage='Closed';c.outcome='FAIL';c.failType='No action';draft=null}
+  else if(a==='failAct'){c.stage='Closed';c.outcome='FAIL';c.failType='Action taken, still insufficient';draft=null}
+  render();
+}
+function render(){renderKpis();renderQueue();renderDetail()}
+render();
+</script>
+</body>
+</html>
